@@ -1,13 +1,18 @@
 #include "main.h"
-#include "logger.h"
+#include "controller.h"
+#include "drive.h"
 
-pros::Motor upper_intake{0},
-			lower_intake{0},
-			r1_drive{0},
-			r2_drive{0},
-			l1_drive{0},
-			l2_drive{0};
+pros::Motor lower_intake{5},
+			shooter1{10},
+			shooter2{13},
+			shooter3{15},
+			r1_drive{3},
+			r2_drive{4},
+			l1_drive{1},
+			l2_drive{2};
 
+pros::ADIDigitalOut pneumatics_port{1, false};
+pros::c::ext_adi_ultrasonic_t distance_sensor{};
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -20,8 +25,11 @@ void initialize() {
 
 	pros::lcd::set_text_color(lv_color_t{0, 0, 0});
 	pros::lcd::set_background_color(lv_color_t{255, 255, 255});
+	pros::c::adi_pin_mode(0, OUTPUT);
+	distance_sensor = pros::c::adi_ultrasonic_init(7, 8);
 	
 	pros::lcd::set_text(0, "Initializing...");
+
 }
 
 /**
@@ -53,9 +61,10 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
+
 void autonomous() 
 {
-	pros::lcd::set_text(0, "Running Autonomous Code");
+	skillsAuton();
 }
 
 /**
@@ -71,34 +80,23 @@ void autonomous()
  * operator control task will be stopped. Re-enabling the robot will restart the
  * task, not resume it from where it left off.
  */
+
 void opcontrol() 
 {
+
 	pros::lcd::set_text(0, "Running Controller Code");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 
-	logger data{};
+	controllerReader inputReader{master};
 
 	while (true) {
 
-		uint8_t buttons = pros::lcd::read_buttons();
-		
-		data.update_info(master);
-		data.log_info();
+		inputReader.update_info();
 
-		/* set the drive motor speeds */
-
-		r1_drive = data.cRy;
-		r2_drive = data.cRy;
-
-		l1_drive = data.cLy;
-		l2_drive = data.cLy;
-
-		/* Adjust the speeds and the direction of the intake motors */
-
-		lower_intake = (data.intaking ? 127 : 0);
-		upper_intake = (data.intaking ? 127 : 0);
-
+		tankDrive(inputReader);
 
 		pros::delay(20);
+
+		pros::lcd::print(3, "Distance: %d cm", pros::c::ext_adi_ultrasonic_get(distance_sensor));
 	}
 }
